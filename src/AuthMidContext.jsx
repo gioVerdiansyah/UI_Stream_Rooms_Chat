@@ -20,9 +20,7 @@ const AuthProvider = ({ children }) => {
             dispatch(changeLoginStatus(true))
         }
 
-        if (!hasAccess && !isAuthenticated) {
-            navigate(pathRoutes.login)
-        } else {
+        if (hasAccess && isAuthenticated) {
             navigate(pathRoutes.dashboard)
         }
     }, []);

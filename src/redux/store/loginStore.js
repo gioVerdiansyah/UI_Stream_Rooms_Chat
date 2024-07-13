@@ -1,9 +1,17 @@
 const CHANGE_LOGIN_STATUS = 'CHANGE_LOGIN_STATUS'
 const SET_STATE_LOGIN_FIELDS = "SET_STATE_LOGIN_FIELDS"
+const RESET_STATE = "RESET_STATE"
 
 export function changeLoginStatus(status) {
     return {
         type: CHANGE_LOGIN_STATUS,
+        status
+    }
+}
+
+export function resetLoginState(status) {
+    return {
+        type: RESET_STATE,
         status
     }
 }
@@ -40,6 +48,13 @@ function loginStore(state = initialState, action) {
             return {
                 ...state,
                 isLoggedIn: state.isLoggedIn,
+            };
+
+        case RESET_STATE:
+            return {
+                ...state,
+                isLoggedIn: initialState.isLoggedIn,
+                fields: initialState.fields,
             };
         default:
             return state;

@@ -3,7 +3,7 @@ import { ToastContainer, toast } from "react-toastify";
 import InputLabelComponent from "../components/core/InputLabel";
 import LoadingAnimation from "../components/core/LoadingAnimation";
 import { useDispatch, useSelector } from "react-redux";
-import { setLoginDataInput } from "../redux/store/loginStore";
+import { resetLoginState, setLoginDataInput } from "../redux/store/loginStore";
 import fetcher from "../utils/fetcher";
 import { apiRoutes } from "../routes/api";
 import { useContext } from "react";
@@ -34,6 +34,7 @@ export default function Login() {
     console.log(res);
     if (res?.meta?.isSuccess) {
       loginUser(res?.data);
+      dispatch(resetLoginState())
     } else {
       toast.error(res?.meta?.message);
     }
