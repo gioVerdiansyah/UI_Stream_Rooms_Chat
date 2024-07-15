@@ -39,7 +39,6 @@ const initialState = {
 function userStore(state = initialState, action) {
     switch (action.type) {
         case USER_GET:
-            console.log(action.payload)
             return {
                 ...state,
                 users: action.payload,

@@ -12,7 +12,7 @@ export function changeLoginStatus(status) {
 export function resetLoginState(status) {
     return {
         type: RESET_STATE,
-        status
+        status: status
     }
 }
 
@@ -47,12 +47,11 @@ function loginStore(state = initialState, action) {
         case CHANGE_LOGIN_STATUS:
             return {
                 ...state,
-                isLoggedIn: state.isLoggedIn,
+                isLoggedIn: action.status,
             };
 
         case RESET_STATE:
             return {
-                ...state,
                 isLoggedIn: initialState.isLoggedIn,
                 fields: initialState.fields,
             };

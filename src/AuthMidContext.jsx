@@ -12,21 +12,29 @@ const AuthProvider = ({ children }) => {
     const dispatch = useDispatch()
     const navigate = useNavigate()
     const cookieName = import.meta.env.VITE_COOKIE_NAME
+    const hasAccess = Cookie.get(cookieName);
+    const hasJoin = Cookie.get(import.meta.env.VITE_USER_COOKIE_NAME);
     
     useEffect(() => {
-        const hasAccess = Cookie.get(cookieName);
-
-        if (hasAccess) {
-            dispatch(changeLoginStatus(true))
-        }
-
-        if (hasAccess && isAuthenticated) {
-            navigate(pathRoutes.dashboard)
+        if (hasAccess == import.meta.env.VITE_LOGIN_TOKEN) {
+          dispatch(changeLoginStatus(true));
+        }else{
+            if(hasJoin){
+                navigate(pathRoutes.chatting)
+            }else{
+                navigate(pathRoutes.welcomeUser)
+            }
         }
     }, []);
     
+    useEffect(() => {
+        if (hasAccess && isAuthenticated) {
+            navigate(pathRoutes.dashboard)
+        }
+    },[isAuthenticated])
+    
     const loginUser = (token) => {
-        Cookie.set(cookieName, token, { expires: 3, secure: true, sameSite: 'strict' });
+        Cookie.set(cookieName, token, { expires: 1 });
         dispatch(changeLoginStatus(false))
         navigate(pathRoutes.dashboard)
     };

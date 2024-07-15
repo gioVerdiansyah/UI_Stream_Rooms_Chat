@@ -93,7 +93,6 @@ export default function AdminChatRoomDashboard() {
       method: "GET",
     });
 
-    console.log(res)
     if (res?.meta?.isSuccess) {
       dispatch(onUserInit(res?.data));
     } else {
@@ -132,50 +131,46 @@ export default function AdminChatRoomDashboard() {
   }, [dispatch, onEdit.onEdit]);
 
   useEffect(() => {
-    if (typeof rooms == "object" && rooms?.length < 1) {
+    if (typeof rooms === "object" && rooms?.length < 1) {
       handleGetRoomsFirstTime();
     }
 
-    if (typeof users == "object" && users?.length < 1) {
+    if (typeof users === "object" && users?.length < 1) {
       handleGetUsersFirstTime();
     }
 
-    socket.on("stream_rooms", (response) => {
-      if (response.status == "create") {
-        console.log(response);
+    const handleStreamRooms = (response) => {
+      if (response.status === "create") {
         dispatch(onRoomStore(response.data));
       }
-      if (response.status == "update") {
+      if (response.status === "update") {
         dispatch(onRoomEdit(response.data));
       }
-      if (response.status == "delete") {
+      if (response.status === "delete") {
         dispatch(onRoomDelete(response.data._id));
       }
-    });
+    };
 
-    socket.on("stream_users", (response) => {
-      if (response.status == "create") {
-        console.log(response);
+    const handleStreamUsers = (response) => {
+      if (response.status === "create") {
         dispatch(onUserStore(response.data));
       }
-      if (response.status == "update") {
+      if (response.status === "update") {
         dispatch(onUserEdit(response.data));
       }
-      if (response.status == "delete") {
+      if (response.status === "delete") {
         dispatch(onUserDelete(response.data._id));
       }
-    });
+    };
+
+    socket.on("stream_rooms", handleStreamRooms);
+    socket.on("stream_users", handleStreamUsers);
 
     return () => {
-      socket.off("stream_rooms", (response) => {
-        console.log(response);
-      });
-
-      socket.off("stream_users", (response) => {
-        console.log(response);
-      });
+      socket.off("stream_rooms", handleStreamRooms);
+      socket.off("stream_users", handleStreamUsers);
     };
-  }, []);
+  }, [rooms, users, dispatch]);
 
   return (
     <main className="bg-black">
@@ -191,7 +186,7 @@ export default function AdminChatRoomDashboard() {
                 {users?.length > 0 ? (
                   users.map((item, index) => (
                     <li className="mx-3" key={index}>
-                      {item.name}
+                      {item.username}
                     </li>
                   ))
                 ) : (

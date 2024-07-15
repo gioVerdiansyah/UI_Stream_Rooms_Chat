@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { io } from "socket.io-client";
 import {
@@ -6,52 +6,182 @@ import {
   onRoomEdit,
   onRoomInit,
   onRoomStore,
+  setJoinRoom,
+  setNewUsername,
 } from "../redux/store/roomStore";
 import fetcher from "../utils/fetcher";
 import { toast, ToastContainer } from "react-toastify";
 import { apiRoutes } from "../routes/api";
-
-const socket = io(import.meta.env.VITE_WEBSOCKET_URL, {
-  extraHeaders: {
-    "x-socket-key": import.meta.env.VITE_API_KEY,
-  },
-});
+import { onBlurInput, onFocusInput } from "../redux/store/usernameStore";
+import Cookies from "js-cookie";
+import FirstPageChat from "./components/fragments/FistPageChat";
+import {
+  onChatDelete,
+  onChatEdit,
+  onChatInit,
+  onChatStore,
+  resetChat,
+} from "../redux/store/chatStore";
+import { ChatMe, ChatYou } from "./components/fragments/ChatFragment";
+import { setLoading } from "../redux/store/trueOrFalseStore";
 
 export default function Chatting() {
   const dispatch = useDispatch();
-  const rooms = useSelector((state) => state.onRoomState).rooms;
-
-  const handleGetRoomsFirstTime = async () => {
-    const res = await fetcher(apiRoutes.getRoom, {
-      method: "GET",
-    });
-
-    if (res?.meta?.isSuccess) {
-      dispatch(onRoomInit(res?.data));
-    } else {
-      toast.error(res?.meta?.message);
-    }
-  };
+  const roomState = useSelector((state) => state.onRoomState);
+  const chatState = useSelector((state) => state.chatState);
+  const isLoading = useSelector((state) => state.trueOrFalseState).isLoading;
+  const usernameState = useSelector((state) => state.usernameState);
+  const socketRef = useRef(null);
 
   useEffect(() => {
-    if (typeof rooms == "object" && rooms?.length < 1) {
+    const userToken = Cookies.get(import.meta.env.VITE_USER_COOKIE_NAME);
+    socketRef.current = io(import.meta.env.VITE_WEBSOCKET_URL, {
+      extraHeaders: {
+        "x-socket-key": import.meta.env.VITE_API_KEY,
+        "User-Token": userToken,
+      },
+    });
+
+    const socket = socketRef.current;
+
+    const handleGetRoomsFirstTime = async () => {
+      const res = await fetcher(apiRoutes.getRoom, { method: "GET" });
+
+      if (res?.meta?.isSuccess) {
+        dispatch(onRoomInit(res?.data));
+      } else {
+        toast.error(res?.meta?.message);
+      }
+    };
+
+    const handleStreamRooms = (response) => {
+      if (response.status === "create") {
+        dispatch(onRoomStore(response.data));
+      }
+      if (response.status === "update") {
+        dispatch(onRoomEdit(response.data));
+      }
+      if (response.status === "delete") {
+        dispatch(onRoomDelete(response.data._id));
+      }
+    };
+
+    const handleStreamChats = (response) => {
+      if (response.status === "create") {
+        dispatch(onChatStore(response.data));
+      }
+      if (response.status === "update") {
+        dispatch(onChatEdit(response.data));
+      }
+      if (response.status === "delete") {
+        dispatch(onChatDelete(response.data._id));
+      }
+    };
+
+    const handleChangeUsername = (response) => {
+      dispatch(setNewUsername(response.data));
+    };
+
+    const getNewsChat = async (room_id) => {
+      const res = await fetcher(apiRoutes.newsChat + "?room_id=" + room_id);
+
+      console.log(res);
+      if (res?.meta?.isSuccess) {
+        setTimeout(() => {
+          dispatch(setLoading(false))
+          dispatch(onChatInit(res?.data));
+        }, 1000)
+      } else {
+        console.log(res);
+      }
+    };
+
+    const handleJoinedRoom = (response) => {
+      if (response?.meta?.isSuccess) {
+        dispatch(setJoinRoom(response.data.id, response.data.name));
+        getNewsChat(response.data.id);
+      } else {
+        dispatch(setJoinRoom(null));
+      }
+    };
+
+    const handleWantNewName = () => {
+      socket.emit("want_username");
+    };
+
+    const handleInitLatestJoinedRoom = () => {
+      socket.emit("want_latest_joined_room");
+    };
+
+    if (typeof roomState.rooms === "object" && roomState.rooms?.length < 1) {
       handleGetRoomsFirstTime();
     }
 
-    socket.on("stream_rooms", (response) => {
-      if (response.status == "create") {
-        console.log(response);
-        dispatch(onRoomStore(response.data));
-      }
-      if (response.status == "update") {
-        dispatch(onRoomEdit(response.data));
-      }
-      if (response.status == "delete") {
-        dispatch(onRoomDelete(response.data._id));
+    if (!roomState.username_in_chat) {
+      handleWantNewName();
+    }
+
+    if (roomState.current_room == null) {
+      handleInitLatestJoinedRoom();
+    }
+
+    socket.on("want_username_response", handleChangeUsername);
+    socket.on("stream_rooms", handleStreamRooms);
+    socket.on("latest_user_room_response", handleJoinedRoom);
+    socket.on("chat_response", handleStreamChats);
+
+    return () => {
+      socket.off("stream_rooms", handleStreamRooms);
+      socket.off("want_username_response", handleChangeUsername);
+      socket.off("latest_user_room_response", handleJoinedRoom);
+      socket.off("chat_response", handleStreamChats);
+      socket.disconnect();
+    };
+  }, [dispatch, roomState.rooms, usernameState.username]);
+
+  const handleLeaveRoom = () => {
+    return new Promise((resolve, reject) => {
+      if (roomState.current_room && roomState.current_room !== null) {
+        socketRef.current.emit(
+          "leave_room",
+          roomState.current_room.id,
+          (ack) => {
+            if (ack) {
+              resolve();
+            } else {
+              reject(new Error("Failed to leave room"));
+            }
+          }
+        );
+      } else {
+        resolve();
       }
     });
-  }, []);
+  };
 
+  const handleJoinRoom = async (room_id) => {
+    try {
+      await handleLeaveRoom();
+      socketRef.current.emit("join_room", room_id);
+      dispatch(resetChat());
+      dispatch(setLoading(true));
+    } catch (error) {
+      console.error("Error leaving room:", error);
+    }
+  };
+
+  const handleSendChat = (e) => {
+    e.preventDefault();
+    const value = e.target.chat_input.value;
+    if (value.trim() !== "") {
+      console.log(roomState.current_room.id);
+      socketRef.current.emit("send_chat", {
+        message: value,
+        room_id: roomState.current_room.id,
+      });
+      e.target.reset();
+    }
+  };
   return (
     <div className="bg-black flex flex-row w-svw h-svh font-mono">
       <ToastContainer />
@@ -59,19 +189,50 @@ export default function Chatting() {
         <div className="profile flex flex-col border border-success border-x-0 px-2">
           <p className="text-sm text-gray-400">Username</p>
           <div>
-            <p className="font-bold text-center">Verdi</p>
+            {usernameState.onFocus ? (
+              <form>
+                <input
+                  type="text"
+                  name="username"
+                  className="input input-success h-5 w-full"
+                  onBlur={() => dispatch(onBlurInput())}
+                  placeholder="Type new username"
+                  autoFocus
+                />
+              </form>
+            ) : (
+              <p
+                className="font-bold text-center"
+                onDoubleClick={() => dispatch(onFocusInput())}
+              >
+                {roomState.username_in_chat}
+              </p>
+            )}
           </div>
         </div>
         <div className="profile flex flex-col border border-success mt-4 ps-2 h-5/6">
           <p className="text-sm text-gray-400 mb-3">Available Rooms</p>
-          <div className="overflow-scroll w-full">
+          <div className="overflow-scroll w-full h-full">
             <ol className="ms-8 list-disc">
-              {rooms?.length > 0 &&
-                rooms.map((item, index) => (
-                  <li key={index} className="font-bold text-gray-400">
-                    <button>{item.name}</button>
-                  </li>
-                ))}
+              {roomState.rooms?.length > 0 &&
+                roomState.rooms.map((item) => {
+                  return (
+                    <li
+                      key={item._id}
+                      className={
+                        "font-bold " +
+                        (roomState.current_room !== null &&
+                        item._id === roomState.current_room.id
+                          ? ""
+                          : "text-gray-400")
+                      }
+                    >
+                      <button onClick={() => handleJoinRoom(item._id)}>
+                        {item.name}
+                      </button>
+                    </li>
+                  );
+                })}
             </ol>
           </div>
         </div>
@@ -80,121 +241,58 @@ export default function Chatting() {
         </button>
       </aside>
       <main className="border border-success w-full relative">
-        <nav className="border border-success h-14 flex flex-row justify-between items-center px-5">
-          <p className="font-bold">Room 1</p>
-          <p className="font-bold">20:30</p>
-        </nav>
-        <div className="content px-5 py-3 h-5/6 overflow-y-scroll">
-          <div className="chat-content">
-            <p className="username">si A</p>
-            <div className="chat-message w-3/4 ms-5">
-              <div className="triangle-thumb"></div>
-              <p className="text-gray-400 border border-success px-5 py-3">
-                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Eos
-                esse quo dolorem necessitatibus consequuntur atque quam, sit
-                nobis nostrum, similique dolor, quibusdam labore enim nulla?
-              </p>
-              <p className="text-gray-400 text-xs text-end">10:20 AM</p>
+        {roomState.current_room ? (
+          <>
+            <nav className="border border-success h-14 flex flex-row justify-between items-center px-5">
+              <p className="font-bold">{roomState.current_room.name}</p>
+              <p className="font-bold">20:30</p>
+            </nav>
+            <div className="content px-5 py-3 h-5/6 overflow-y-scroll">
+              {isLoading ? (
+                <div className="w-full flex justify-center">
+                  <span className="loading loading-spinner text-success"></span>
+                </div>
+              ) : chatState.chats && chatState.chats.length > 0 ? (
+                chatState.chats.map((item, index) =>
+                  item.user_id ===
+                  Cookies.get(import.meta.env.VITE_USER_COOKIE_NAME) ? (
+                    <ChatMe
+                      key={index}
+                      username={item.name}
+                      message={item.message}
+                    />
+                  ) : (
+                    <ChatYou
+                      key={index}
+                      username={item.name}
+                      message={item.message}
+                    />
+                  )
+                )
+              ) : (
+                <p className="text-center font-bold">Chat is Empty...</p>
+              )}
             </div>
-          </div>
-          {/* You */}
-          <div className="chat-content flex flex-col items-end">
-            <p className="username text-end">Verdi</p>
-            <div className="chat-message w-3/4 me-5">
-              <div className="triangle-thumb-you"></div>
-              <p className="text-gray-400 border border-success px-5 py-3">
-                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Eos
-                esse quo dolorem necessitatibus consequuntur atque quam, sit
-                nobis nostrum, similique dolor, quibusdam labore enim nulla?
-              </p>
-              <p className="text-gray-400 text-xs">10:20 AM</p>
-            </div>
-          </div>
-          <div className="chat-content">
-            <p className="username">si A</p>
-            <div className="chat-message w-3/4 ms-5">
-              <div className="triangle-thumb"></div>
-              <p className="text-gray-400 border border-success px-5 py-3">
-                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Eos
-                esse quo dolorem necessitatibus consequuntur atque quam, sit
-                nobis nostrum, similique dolor, quibusdam labore enim nulla?
-              </p>
-              <p className="text-gray-400 text-xs text-end">10:20 AM</p>
-            </div>
-          </div>
-          {/* You */}
-          <div className="chat-content flex flex-col items-end">
-            <p className="username text-end">Verdi</p>
-            <div className="chat-message w-3/4 me-5">
-              <div className="triangle-thumb-you"></div>
-              <p className="text-gray-400 border border-success px-5 py-3">
-                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Eos
-                esse quo dolorem necessitatibus consequuntur atque quam, sit
-                nobis nostrum, similique dolor, quibusdam labore enim nulla?
-              </p>
-              <p className="text-gray-400 text-xs">10:20 AM</p>
-            </div>
-          </div>
-          <div className="chat-content">
-            <p className="username">si A</p>
-            <div className="chat-message w-3/4 ms-5">
-              <div className="triangle-thumb"></div>
-              <p className="text-gray-400 border border-success px-5 py-3">
-                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Eos
-                esse quo dolorem necessitatibus consequuntur atque quam, sit
-                nobis nostrum, similique dolor, quibusdam labore enim nulla?
-              </p>
-              <p className="text-gray-400 text-xs text-end">10:20 AM</p>
-            </div>
-          </div>
-          {/* You */}
-          <div className="chat-content flex flex-col items-end">
-            <p className="username text-end">Verdi</p>
-            <div className="chat-message w-3/4 me-5">
-              <div className="triangle-thumb-you"></div>
-              <p className="text-gray-400 border border-success px-5 py-3">
-                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Eos
-                esse quo dolorem necessitatibus consequuntur atque quam, sit
-                nobis nostrum, similique dolor, quibusdam labore enim nulla?
-              </p>
-              <p className="text-gray-400 text-xs">10:20 AM</p>
-            </div>
-          </div>
-          <div className="chat-content">
-            <p className="username">si A</p>
-            <div className="chat-message w-3/4 ms-5">
-              <div className="triangle-thumb"></div>
-              <p className="text-gray-400 border border-success px-5 py-3">
-                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Eos
-                esse quo dolorem necessitatibus consequuntur atque quam, sit
-                nobis nostrum, similique dolor, quibusdam labore enim nulla?
-              </p>
-              <p className="text-gray-400 text-xs text-end">10:20 AM</p>
-            </div>
-          </div>
-          {/* You */}
-          <div className="chat-content flex flex-col items-end">
-            <p className="username text-end">Verdi</p>
-            <div className="chat-message w-3/4 me-5">
-              <div className="triangle-thumb-you"></div>
-              <p className="text-gray-400 border border-success px-5 py-3">
-                Lorem ipsum dolor sit amet consectetur, adipisicing elit. Eos
-                esse quo dolorem necessitatibus consequuntur atque quam, sit
-                nobis nostrum, similique dolor, quibusdam labore enim nulla?
-              </p>
-              <p className="text-gray-400 text-xs">10:20 AM</p>
-            </div>
-          </div>
-        </div>
-        <form className="chat-input absolute bottom-2.5 w-full px-10 flex flex-row">
-          <input
-            type="text"
-            className="input input-bordered w-full placeholder:text-gray-400 input-success"
-            placeholder="Type here to message..."
-            autoFocus
-          />
-          <button className="btn btn-outline btn-success">Send</button>
-        </form>
+            <form
+              className="chat-input absolute bottom-2.5 w-full px-10 flex flex-row"
+              onSubmit={handleSendChat}
+            >
+              <input
+                type="text"
+                className="input input-bordered w-full placeholder:text-gray-400 input-success"
+                placeholder="Type here to message..."
+                name="chat_input"
+                autoComplete="off"
+                autoFocus
+              />
+              <button type="submit" className="btn btn-outline btn-success">
+                Send
+              </button>
+            </form>
+          </>
+        ) : (
+          <FirstPageChat />
+        )}
       </main>
     </div>
   );

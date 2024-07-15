@@ -2,39 +2,40 @@ import { useDispatch, useSelector } from "react-redux";
 import NavbarUser from "./components/fragments/NavbarUser";
 import {
   onBlurInput,
-  onEnterChat,
   onErrorJoinChat,
   onFocusInput,
-} from "../redux/store/onJoinChatStore";
+  onSetUsername,
+} from "../redux/store/usernameStore";
 import { useNavigate } from "react-router-dom";
 import { webPath } from "../routes/web";
 import fetcher from "../utils/fetcher";
 import { apiRoutes } from "../routes/api";
+import Cookies from "js-cookie";
 
 export default function WelcomeUser() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const userJoinChat = useSelector((state) => state.onJoinChatState);
+  const userJoinChat = useSelector((state) => state.usernameState);
 
   const handleOnJoinChat = async (e) => {
     e.preventDefault();
-    if (userJoinChat.onEnterRoom == "Admin") {
+    if (userJoinChat.username == "Admin") {
       navigate(webPath.login);
     } else {
       const res = await fetcher(apiRoutes.userLogin, {
         method: "POST",
-        body: JSON.stringify({ username: e.target.username.value }),
+        body: JSON.stringify({ username: userJoinChat.username }),
       });
 
-      console.log(res);
       if (res?.meta?.isSuccess) {
-        // console.log(res)
+        dispatch(onBlurInput())
+        Cookies.set(import.meta.env.VITE_USER_COOKIE_NAME, res?.data);
+        navigate(webPath.chatting)
       } else {
         console.error(res);
         dispatch(onErrorJoinChat(res?.meta?.message));
       }
     }
-    console.log(userJoinChat)
   };
 
   return (
@@ -56,7 +57,7 @@ export default function WelcomeUser() {
             name="username"
             onFocus={() => dispatch(onFocusInput())}
             onBlur={() => dispatch(onBlurInput())}
-            onChange={(e) => dispatch(onEnterChat(e.target.value))}
+            onChange={(e) => dispatch(onSetUsername(e.target.value))}
             className={
               "input input-bordered w-full max-w-xs placeholder:text-center input-" +
               (userJoinChat.error ? "error" : "success")

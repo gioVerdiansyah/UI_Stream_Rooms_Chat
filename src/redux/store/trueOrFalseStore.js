@@ -4,7 +4,7 @@ const IS_SHOW_MODAL = "IS_SHOW_MODAL"
 export function setLoading(bool){
     return {
         type: IS_LOADING,
-        bool
+        val: bool
     }
 }
 
@@ -25,7 +25,7 @@ function trueOrFalseStore(state = initialState, action){
         case IS_LOADING:
             return {
                 ...state,
-                isLoading: !state.isLoading
+                isLoading: action.val
             }
         case IS_SHOW_MODAL:
             return {

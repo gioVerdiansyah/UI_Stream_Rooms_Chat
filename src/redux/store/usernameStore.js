@@ -1,6 +1,6 @@
 export const ON_FOCUS_INPUT = "ON_FOCUS_INPUT";
 export const ON_BLUR_INPUT = "ON_BLUR_INPUT";
-export const ON_ENTER_ROOM = "ON_ENTER_ROOM";
+export const ON_SET_USERNAME = "ON_SET_USERNAME";
 export const ON_ERROR_INPUT = "ON_ERROR_INPUT";
 
 export const onFocusInput = () => ({
@@ -11,8 +11,8 @@ export const onBlurInput = () => ({
     type: ON_BLUR_INPUT,
 });
 
-export const onEnterChat = (username) => ({
-    type: ON_ENTER_ROOM,
+export const onSetUsername = (username) => ({
+    type: ON_SET_USERNAME,
     payload: username,
 });
 
@@ -26,10 +26,10 @@ const initialState = {
     onFocus: false,
     onBlur: false,
     error: "",
-    onEnterRoom: '',
+    username: null,
 };
 
-const onJoinChatStore = (state = initialState, action) => {
+const usernameStore = (state = initialState, action) => {
     switch (action.type) {
         case ON_FOCUS_INPUT:
             return {
@@ -48,14 +48,14 @@ const onJoinChatStore = (state = initialState, action) => {
                 onFocus: false,
                 onBlur: true,
             };
-        case ON_ENTER_ROOM:
+        case ON_SET_USERNAME:
             return {
                 ...state,
-                onEnterRoom: action.payload,
+                username: action.payload,
             };
         default:
             return state;
     }
 };
 
-export default onJoinChatStore;
+export default usernameStore;

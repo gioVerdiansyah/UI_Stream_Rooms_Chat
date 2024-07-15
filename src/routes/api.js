@@ -8,5 +8,6 @@ export const apiRoutes = {
     editRoom: url + "admin/room/edit",
     deleteRoom: url + "admin/room/delete",
 
-    userLogin: url + "user/join"
+    userLogin: url + "user/join",
+    newsChat: url + "user/chat/get"
 }
