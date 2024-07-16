@@ -4,7 +4,8 @@ import {
   onBlurInput,
   onErrorJoinChat,
   onFocusInput,
-  onSetUsername,
+  onSetFieldsLoginRegister,
+  onUnSetFields,
 } from "../redux/store/usernameStore";
 import { useNavigate } from "react-router-dom";
 import { webPath } from "../routes/web";
@@ -17,20 +18,30 @@ export default function WelcomeUser() {
   const navigate = useNavigate();
   const userJoinChat = useSelector((state) => state.usernameState);
 
+  const handleChangeInput = (e) => {
+    const { name, value } = e.target;
+    dispatch(onSetFieldsLoginRegister({ [name]: value }));
+  };
+
   const handleOnJoinChat = async (e) => {
     e.preventDefault();
-    if (userJoinChat.username == "Admin") {
+    const usr = userJoinChat.fields.username?.trim().toLowerCase();
+    console.log(usr)
+    if (usr === "admin" || usr == "administrator" || usr == "administrators") {
       navigate(webPath.login);
     } else {
       const res = await fetcher(apiRoutes.userLogin, {
         method: "POST",
-        body: JSON.stringify({ username: userJoinChat.username }),
+        body: JSON.stringify(userJoinChat.fields),
       });
 
       if (res?.meta?.isSuccess) {
-        dispatch(onBlurInput())
-        Cookies.set(import.meta.env.VITE_USER_COOKIE_NAME, res?.data);
-        navigate(webPath.chatting)
+        dispatch(onBlurInput());
+        dispatch(onUnSetFields());
+        Cookies.set(import.meta.env.VITE_USER_COOKIE_NAME, res?.data, {
+          expires: 1,
+        });
+        navigate(webPath.chatting);
       } else {
         console.error(res);
         dispatch(onErrorJoinChat(res?.meta?.message));
@@ -48,7 +59,7 @@ export default function WelcomeUser() {
         <label htmlFor="username" className="font-mono mb-5">
           {userJoinChat.onFocus
             ? "Press Enter to join room"
-            : "Enter name to join room"}
+            : "Fill fields to join room"}
         </label>
         <div className="w-full flex flex-col items-center justify-center">
           <input
@@ -57,9 +68,24 @@ export default function WelcomeUser() {
             name="username"
             onFocus={() => dispatch(onFocusInput())}
             onBlur={() => dispatch(onBlurInput())}
-            onChange={(e) => dispatch(onSetUsername(e.target.value))}
+            onChange={handleChangeInput}
+            defaultValue={userJoinChat.fields.username}
             className={
               "input input-bordered w-full max-w-xs placeholder:text-center input-" +
+              (userJoinChat.error ? "error" : "success")
+            }
+            required
+          />
+          <input
+            type="password"
+            placeholder="Your Password"
+            name="password"
+            onFocus={() => dispatch(onFocusInput())}
+            onBlur={() => dispatch(onBlurInput())}
+            onChange={handleChangeInput}
+            defaultValue={userJoinChat.fields.password}
+            className={
+              "mt-5 input input-bordered w-full max-w-xs placeholder:text-center input-" +
               (userJoinChat.error ? "error" : "success")
             }
             required
@@ -67,6 +93,7 @@ export default function WelcomeUser() {
           {userJoinChat.error && (
             <p className="text-red-500">{userJoinChat.error}</p>
           )}
+          <button className="btn btn-outline btn-success mt-5">Join</button>
         </div>
       </form>
     </div>

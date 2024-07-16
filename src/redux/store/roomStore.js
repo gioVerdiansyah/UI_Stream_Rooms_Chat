@@ -3,6 +3,7 @@ const ROOM_STORE = "ROOM_STORE";
 const ROOM_EDIT = "ROOM_EDIT"
 const ROOM_DELETE = "ROOM_DELETE"
 const SET_JOINED_ROOM = "SET_JOINED_ROOM"
+const DELETED_CURRENT_ROOM = "DELETED_CURRENT_ROOM"
 const SET_NEW_USERNAME = "SET_NEW_USERNAME"
 
 export const onRoomInit = (data) => {
@@ -38,6 +39,12 @@ export const setJoinRoom = (room_id, room_name) => {
     return {
         type: SET_JOINED_ROOM,
         data: { id: room_id, name: room_name }
+    }
+}
+
+export const deletedCurrentRoom = () => {
+    return {
+        type: DELETED_CURRENT_ROOM
     }
 }
 
@@ -87,6 +94,12 @@ function roomStore(state = initialState, action) {
             return {
                 ...state,
                 current_room: { ...state.current_room, id: action.data.id, name: action.data.name }
+            };
+        
+        case DELETED_CURRENT_ROOM:
+            return {
+                ...state,
+                current_room: null
             };
 
         case SET_NEW_USERNAME:

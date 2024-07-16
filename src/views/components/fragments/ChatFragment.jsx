@@ -1,4 +1,6 @@
-export function ChatYou({ username = "", message = "" }) {
+import { formatTime } from "../../../utils/handleDates";
+
+export function ChatYou({ username = "", message = "" , date = ""}) {
   return (
     <div className="chat-content">
       <p className="username">{username}</p>
@@ -7,13 +9,13 @@ export function ChatYou({ username = "", message = "" }) {
         <p className="text-gray-400 border border-success px-5 py-3 text-wrap break-words">
           {message}
         </p>
-        <p className="text-gray-400 text-xs text-end">10:20 AM</p>
+        <p className="text-gray-400 text-xs text-end">{formatTime(date)}</p>
       </div>
     </div>
   );
 }
 
-export function ChatMe({ username = "", message = "" }) {
+export function ChatMe({ username = "", message = "" , date = ""}) {
   return (
     <div className="chat-content flex flex-col items-end">
       <p className="username text-end">{username}</p>
@@ -22,7 +24,7 @@ export function ChatMe({ username = "", message = "" }) {
         <p className="text-gray-400 border border-success px-5 py-3 text-wrap break-words">
           {message}
         </p>
-        <p className="text-gray-400 text-xs">10:20 AM</p>
+        <p className="text-gray-400 text-xs">{formatTime(date)}</p>
       </div>
     </div>
   );

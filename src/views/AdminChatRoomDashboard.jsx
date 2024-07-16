@@ -21,20 +21,24 @@ import {
   onUserInit,
   onUserStore,
 } from "../redux/store/userStore";
+import { resetLog, setLog } from "../redux/store/adminLogStore";
 
 const socket = io(import.meta.env.VITE_WEBSOCKET_URL, {
   extraHeaders: {
     "x-socket-key": import.meta.env.VITE_API_KEY,
+    "Access-permission-Admin-code": import.meta.env.VITE_ADMIN_PERMISSION,
   },
 });
 
 export default function AdminChatRoomDashboard() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const onEdit = useSelector((state) => state.onEditState);
   const rooms = useSelector((state) => state.onRoomState).rooms;
   const users = useSelector((state) => state.onUserState).users;
   const { logoutUser } = useContext(AuthMidContext);
-  const navigate = useNavigate();
+  const logs = useSelector((state) => state.adminLogState);
+  const streamLogRef = useRef(null);
 
   const handleOnEdit = (id, name) => {
     dispatch(on_edit({ onEdit: true, data: { id: id, room_name: name } }));
@@ -99,8 +103,13 @@ export default function AdminChatRoomDashboard() {
       toast.error(res?.meta?.message);
     }
   };
+  const handleStreamLogs = (response) => {
+    console.log(response);
+    dispatch(setLog(response));
+  };
 
   const escPressCount = useRef(0);
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
@@ -111,6 +120,10 @@ export default function AdminChatRoomDashboard() {
           navigate(webPath.login);
           escPressCount.current = 0;
         }
+      }
+
+      if (event.ctrlKey && event.altKey && event.key === "c") {
+        dispatch(resetLog());
       }
 
       if (event.ctrlKey && event.key === "q") {
@@ -128,7 +141,7 @@ export default function AdminChatRoomDashboard() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [dispatch, onEdit.onEdit]);
+  }, [dispatch, onEdit.onEdit, logs]);
 
   useEffect(() => {
     if (typeof rooms === "object" && rooms?.length < 1) {
@@ -171,6 +184,20 @@ export default function AdminChatRoomDashboard() {
       socket.off("stream_users", handleStreamUsers);
     };
   }, [rooms, users, dispatch]);
+
+  useEffect(() => {
+    socket.on("stream_logs", handleStreamLogs);
+    return () => {
+      socket.off("stream_logs", handleStreamLogs);
+    };
+  }, [logs]);
+
+  // Auto Scroll
+  useEffect(() => {
+    if (streamLogRef.current) {
+      streamLogRef.current.scrollTop = streamLogRef.current.scrollHeight;
+    }
+  }, [logs]);
 
   return (
     <main className="bg-black">
@@ -244,12 +271,13 @@ export default function AdminChatRoomDashboard() {
           <p className="font-mono translate-x-5 translate-y-3 bg-black w-max">
             Admin console logs
           </p>
-          <div className="box border border-success w-full h-52 overflow-y-scroll">
-            <p>></p>
-            <p>></p>
-            <p>></p>
-            <p>></p>
-            <p>></p>
+          <div
+            className="box border border-success w-full h-52 overflow-y-scroll pt-3"
+            ref={streamLogRef}
+          >
+            {logs.map((item, index) => (
+              <p key={index}>&gt; {item}</p>
+            ))}
           </div>
         </div>
       </div>

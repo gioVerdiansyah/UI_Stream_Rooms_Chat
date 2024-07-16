@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { io } from "socket.io-client";
 import {
+  deletedCurrentRoom,
   onRoomDelete,
   onRoomEdit,
   onRoomInit,
@@ -24,14 +25,21 @@ import {
 } from "../redux/store/chatStore";
 import { ChatMe, ChatYou } from "./components/fragments/ChatFragment";
 import { setLoading } from "../redux/store/trueOrFalseStore";
+import { setTime } from "../redux/store/timeStore";
+import { getCurrentTime } from "../utils/handleDates";
+import { useNavigate } from "react-router-dom";
+import { webPath } from "../routes/web";
 
 export default function Chatting() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const roomState = useSelector((state) => state.onRoomState);
   const chatState = useSelector((state) => state.chatState);
   const isLoading = useSelector((state) => state.trueOrFalseState).isLoading;
   const usernameState = useSelector((state) => state.usernameState);
+  const time = useSelector((state) => state.timeState).time;
   const socketRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   useEffect(() => {
     const userToken = Cookies.get(import.meta.env.VITE_USER_COOKIE_NAME);
@@ -55,14 +63,19 @@ export default function Chatting() {
     };
 
     const handleStreamRooms = (response) => {
+      console.log(response);
       if (response.status === "create") {
         dispatch(onRoomStore(response.data));
       }
       if (response.status === "update") {
         dispatch(onRoomEdit(response.data));
+        dispatch(setJoinRoom(response.data._id, response.data.name));
       }
       if (response.status === "delete") {
         dispatch(onRoomDelete(response.data._id));
+        if (roomState.current_room.id == response.data._id) {
+          dispatch(deletedCurrentRoom());
+        }
       }
     };
 
@@ -79,7 +92,17 @@ export default function Chatting() {
     };
 
     const handleChangeUsername = (response) => {
-      dispatch(setNewUsername(response.data));
+      console.log(response);
+      if (response?.meta?.statusCode == 401) {
+        toast.error(response?.meta?.message);
+      } else {
+        if (!response.data) {
+          Cookies.remove(import.meta.env.VITE_USER_COOKIE_NAME);
+          navigate(webPath.welcomeUser);
+        } else {
+          dispatch(setNewUsername(response.data));
+        }
+      }
     };
 
     const getNewsChat = async (room_id) => {
@@ -88,9 +111,9 @@ export default function Chatting() {
       console.log(res);
       if (res?.meta?.isSuccess) {
         setTimeout(() => {
-          dispatch(setLoading(false))
+          dispatch(setLoading(false));
           dispatch(onChatInit(res?.data));
-        }, 1000)
+        }, 1000);
       } else {
         console.log(res);
       }
@@ -182,19 +205,49 @@ export default function Chatting() {
       e.target.reset();
     }
   };
+
+  const handleChangeUsername = (e) => {
+    e.preventDefault();
+    socketRef.current.emit("rename_username", e.target.username.value);
+    dispatch(onBlurInput());
+  };
+
+  const handleLogout = () => {
+    socketRef.current.disconnect();
+    Cookies.remove(import.meta.env.VITE_USER_COOKIE_NAME);
+    navigate(webPath.welcomeUser);
+  };
+
+  // Auto Scroll
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop =
+        chatContainerRef.current.scrollHeight;
+    }
+  }, [chatState.chats]);
+
+  // Time
+  useEffect(() => {
+    const timer = setInterval(() => {
+      dispatch(setTime(getCurrentTime()));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
   return (
     <div className="bg-black flex flex-row w-svw h-svh font-mono">
-      <ToastContainer />
+      <ToastContainer theme="dark"/>
       <aside className="border border-success w-64 relative">
         <div className="profile flex flex-col border border-success border-x-0 px-2">
           <p className="text-sm text-gray-400">Username</p>
           <div>
             {usernameState.onFocus ? (
-              <form>
+              <form onSubmit={handleChangeUsername}>
                 <input
                   type="text"
                   name="username"
                   className="input input-success h-5 w-full"
+                  defaultValue={roomState.username_in_chat}
                   onBlur={() => dispatch(onBlurInput())}
                   placeholder="Type new username"
                   autoFocus
@@ -236,7 +289,10 @@ export default function Chatting() {
             </ol>
           </div>
         </div>
-        <button className="absolute bottom-0 btn btn-outline btn-success w-full">
+        <button
+          className="absolute bottom-0 btn btn-outline btn-success w-full"
+          onClick={handleLogout}
+        >
           Logout
         </button>
       </aside>
@@ -245,9 +301,12 @@ export default function Chatting() {
           <>
             <nav className="border border-success h-14 flex flex-row justify-between items-center px-5">
               <p className="font-bold">{roomState.current_room.name}</p>
-              <p className="font-bold">20:30</p>
+              <p className="font-bold">{time}</p>
             </nav>
-            <div className="content px-5 py-3 h-5/6 overflow-y-scroll">
+            <div
+              className="content px-5 py-3 h-5/6 overflow-y-scroll"
+              ref={chatContainerRef}
+            >
               {isLoading ? (
                 <div className="w-full flex justify-center">
                   <span className="loading loading-spinner text-success"></span>
@@ -260,12 +319,14 @@ export default function Chatting() {
                       key={index}
                       username={item.name}
                       message={item.message}
+                      date={item.chat_at}
                     />
                   ) : (
                     <ChatYou
                       key={index}
                       username={item.name}
                       message={item.message}
+                      date={item.chat_at}
                     />
                   )
                 )

@@ -6,6 +6,8 @@ import roomStore from "./roomStore.js";
 import userStore from "./userStore.js";
 import usernameStore from "./usernameStore.js";
 import chatStore from "./chatStore.js";
+import timeStore from "./timeStore.js";
+import adminLogStore from "./adminLogStore.js";
 
 const storeStates = combineReducers({
     trueOrFalseState: trueOrFalseStore,
@@ -14,7 +16,9 @@ const storeStates = combineReducers({
     onRoomState: roomStore,
     onUserState: userStore,
     usernameState: usernameStore,
-    chatState: chatStore
+    chatState: chatStore,
+    timeState: timeStore,
+    adminLogState: adminLogStore
 })
 
 export default storeStates
