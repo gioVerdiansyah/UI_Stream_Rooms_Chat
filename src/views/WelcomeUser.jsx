@@ -26,7 +26,6 @@ export default function WelcomeUser() {
   const handleOnJoinChat = async (e) => {
     e.preventDefault();
     const usr = userJoinChat.fields.username?.trim().toLowerCase();
-    console.log(usr)
     if (usr === "admin" || usr == "administrator" || usr == "administrators") {
       navigate(webPath.login);
     } else {

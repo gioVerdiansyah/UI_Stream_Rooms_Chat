@@ -50,6 +50,7 @@ export default function Chatting() {
       },
     });
 
+    if (!userToken) { navigate(webPath.welcomeUser) }
     const socket = socketRef.current;
 
     const handleGetRoomsFirstTime = async () => {
@@ -236,7 +237,7 @@ export default function Chatting() {
   }, []);
   return (
     <div className="bg-black flex flex-row w-svw h-svh font-mono">
-      <ToastContainer theme="dark"/>
+      <ToastContainer theme="dark" />
       <aside className="border border-success w-64 relative">
         <div className="profile flex flex-col border border-success border-x-0 px-2">
           <p className="text-sm text-gray-400">Username</p>
@@ -275,7 +276,7 @@ export default function Chatting() {
                       className={
                         "font-bold " +
                         (roomState.current_room !== null &&
-                        item._id === roomState.current_room.id
+                          item._id === roomState.current_room.id
                           ? ""
                           : "text-gray-400")
                       }
@@ -314,7 +315,7 @@ export default function Chatting() {
               ) : chatState.chats && chatState.chats.length > 0 ? (
                 chatState.chats.map((item, index) =>
                   item.user_id ===
-                  Cookies.get(import.meta.env.VITE_USER_COOKIE_NAME) ? (
+                    Cookies.get(import.meta.env.VITE_USER_COOKIE_NAME) ? (
                     <ChatMe
                       key={index}
                       username={item.name}
